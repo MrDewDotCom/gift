@@ -1774,6 +1774,10 @@ const CONFIG = {
     const list = CONFIG.photos || [];
     if (!list.length) return;
     const gal = $('gallery'), dotsEl = $('dots');
+    // Prevent duplicate cards, listeners, and autoplay timers if celebrate() is triggered again.
+    if (gal.dataset.initialized === 'true') return;
+    gal.dataset.initialized = 'true';
+
     const cards = list.map((ph, i) => {
       const c = document.createElement('figure');
       c.className = 'polaroid';
@@ -1810,11 +1814,25 @@ const CONFIG = {
     $('galPrev').onclick = e => { e.stopPropagation(); show(cur - 1); restart(); };
     $('galNext').onclick = e => { e.stopPropagation(); show(cur + 1); restart(); };
     let sx = null;
-    gal.addEventListener('pointerdown', e => { sx = e.clientX; });
-    gal.addEventListener('pointerup', e => {
+    // Pause autoplay as soon as the user starts touching/dragging the gallery.
+    // Listen on window for release so the timer is resumed even if the pointer
+    // is released just outside the gallery.
+    gal.addEventListener('pointerdown', e => {
+      sx = e.clientX;
+      clearInterval(timer);
+      timer = null;
+    });
+    window.addEventListener('pointerup', e => {
       if (sx === null) return;
-      const dx = e.clientX - sx; sx = null;
-      if (Math.abs(dx) > 40) { show(cur + (dx < 0 ? 1 : -1)); restart(); }
+      const dx = e.clientX - sx;
+      sx = null;
+      if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1));
+      restart();
+    });
+    window.addEventListener('pointercancel', () => {
+      if (sx === null) return;
+      sx = null;
+      restart();
     });
     $('yay').classList.add('photos');
     requestAnimationFrame(() => { show(0); setTimeout(() => gal.classList.add('in'), 50); });
